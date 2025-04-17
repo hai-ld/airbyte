@@ -20,7 +20,6 @@ import io.airbyte.integrations.destination.bigquery.spec.BigqueryConfiguration
 import io.airbyte.integrations.destination.bigquery.spec.GcsFilePostProcessing
 import io.airbyte.integrations.destination.bigquery.spec.GcsStagingSpecification
 import io.airbyte.integrations.destination.bigquery.write.TempUtils
-import jakarta.inject.Singleton
 
 class BigQueryBulkLoader(
     private val storageClient: S3KotlinClient,
@@ -63,7 +62,7 @@ class BigQueryBulkLoader(
     }
 }
 
-@Singleton
+// @Singleton
 class BigQueryBulkLoaderFactory(
     private val catalog: DestinationCatalog,
     private val storageClient: S3KotlinClient,
