@@ -8,27 +8,29 @@ import com.google.cloud.bigquery.BigQuery
 import com.google.cloud.bigquery.FormatOptions
 import com.google.cloud.bigquery.JobInfo
 import com.google.cloud.bigquery.LoadJobConfiguration
-import io.airbyte.cdk.load.command.DestinationCatalog
+import com.google.cloud.bigquery.TableId
 import io.airbyte.cdk.load.command.DestinationStream
 import io.airbyte.cdk.load.file.s3.S3KotlinClient
 import io.airbyte.cdk.load.file.s3.S3Object
 import io.airbyte.cdk.load.message.StreamKey
+import io.airbyte.cdk.load.orchestration.ColumnNameMapping
+import io.airbyte.cdk.load.orchestration.TableName
+import io.airbyte.cdk.load.orchestration.TableNames
 import io.airbyte.cdk.load.write.db.BulkLoader
 import io.airbyte.cdk.load.write.db.BulkLoaderFactory
 import io.airbyte.integrations.destination.bigquery.formatter.BigQueryRecordFormatter
 import io.airbyte.integrations.destination.bigquery.spec.BigqueryConfiguration
 import io.airbyte.integrations.destination.bigquery.spec.GcsFilePostProcessing
 import io.airbyte.integrations.destination.bigquery.spec.GcsStagingSpecification
-import io.airbyte.integrations.destination.bigquery.write.TempUtils
 
 class BigQueryBulkLoader(
     private val storageClient: S3KotlinClient,
     private val bigQueryClient: BigQuery,
     private val bigQueryConfiguration: BigqueryConfiguration,
-    private val stream: DestinationStream,
+    private val rawTableName: TableName,
 ) : BulkLoader<S3Object> {
     override suspend fun load(remoteObject: S3Object) {
-        val rawTableId = TempUtils.rawTableId(bigQueryConfiguration, stream.descriptor)
+        val rawTableId = TableId.of(rawTableName.namespace, rawTableName.name)
         val gcsUri = "gs://${remoteObject.keyWithBucketName}"
 
         val configuration =
@@ -64,14 +66,18 @@ class BigQueryBulkLoader(
 
 // @Singleton
 class BigQueryBulkLoaderFactory(
-    private val catalog: DestinationCatalog,
+    private val names: Map<DestinationStream.Descriptor, Pair<TableNames, ColumnNameMapping>>,
     private val storageClient: S3KotlinClient,
     private val bigQueryClient: BigQuery,
     private val bigQueryConfiguration: BigqueryConfiguration
 ) : BulkLoaderFactory<StreamKey, S3Object> {
     override val maxNumConcurrentLoads: Int = 1
     override fun create(key: StreamKey, partition: Int): BulkLoader<S3Object> {
-        val stream = catalog.getStream(key.stream)
-        return BigQueryBulkLoader(storageClient, bigQueryClient, bigQueryConfiguration, stream)
+        return BigQueryBulkLoader(
+            storageClient,
+            bigQueryClient,
+            bigQueryConfiguration,
+            names[key.stream]!!.first.rawTableName!!,
+        )
     }
 }
